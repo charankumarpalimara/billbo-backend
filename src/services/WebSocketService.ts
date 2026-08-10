@@ -99,8 +99,10 @@ export class WebSocketService {
     if (targetTvSocket && targetTvSocket.readyState === WebSocket.OPEN) {
       targetTvSocket.send(JSON.stringify({ type: 'command', command, value }));
       logger.info(`Forwarded command "${command}" to TV "${tvCode}"`);
+      console.log(`⚡ [WEBSOCKET] Successfully forwarded command "${command}" to TV "${tvCode}"`);
     } else {
       logger.warn(`Failed to send command: TV "${tvCode}" is offline`);
+      console.log(`❌ [WEBSOCKET] Failed to forward command: TV "${tvCode}" is offline`);
       dashboardWs.send(JSON.stringify({ type: 'error', message: `TV ${tvCode} is offline.` }));
     }
   }

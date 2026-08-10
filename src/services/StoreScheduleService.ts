@@ -148,8 +148,12 @@ export class StoreScheduleService {
     return await this.scheduleRepository.delete(id);
   }
 
-  // Active status check: checks if current local time is within any session today
-  async isStoreActive(storeIdOrCode: string): Promise<boolean> {
+  // Active status check: checks if current local time is within any session today, and returns the details
+  async getStoreActiveStatus(storeIdOrCode: string): Promise<{
+    isActive: boolean;
+    currentSession: IStoreSchedule | null;
+    todaySchedules: IStoreSchedule[];
+  }> {
     let store = await Store.findOne({ storeCode: storeIdOrCode }).exec();
     if (!store) {
       try {
@@ -160,7 +164,7 @@ export class StoreScheduleService {
     }
 
     if (!store) {
-      return false;
+      return { isActive: false, currentSession: null, todaySchedules: [] };
     }
 
     const todayStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
@@ -168,8 +172,15 @@ export class StoreScheduleService {
     const currentHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
     const todaysSchedules = await this.scheduleRepository.find({ storeId: store._id.toString(), date: todayStr });
-    return todaysSchedules.some(sch => {
+    
+    const currentSession = todaysSchedules.find(sch => {
       return currentHHMM >= sch.startTime && currentHHMM <= sch.endTime;
-    });
+    }) || null;
+
+    return {
+      isActive: currentSession !== null,
+      currentSession,
+      todaySchedules: todaysSchedules
+    };
   }
 }

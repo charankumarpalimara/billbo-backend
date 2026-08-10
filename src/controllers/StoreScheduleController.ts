@@ -62,8 +62,8 @@ export class StoreScheduleController {
 
   public getStoreActiveStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const isActive = await this.scheduleService.isStoreActive(req.params.storeId);
-      res.json({ isActive });
+      const statusInfo = await this.scheduleService.getStoreActiveStatus(req.params.storeId);
+      res.json(statusInfo);
     } catch (error) {
       next(error);
     }
