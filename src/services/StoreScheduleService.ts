@@ -1,5 +1,6 @@
 import { StoreScheduleRepository } from '../repositories/StoreScheduleRepository';
 import { IStoreSchedule } from '../models/StoreSchedule';
+import { Store } from '../models/Store';
 
 export class StoreScheduleService {
   private scheduleRepository = new StoreScheduleRepository();
@@ -148,12 +149,25 @@ export class StoreScheduleService {
   }
 
   // Active status check: checks if current local time is within any session today
-  async isStoreActive(storeId: string): Promise<boolean> {
+  async isStoreActive(storeIdOrCode: string): Promise<boolean> {
+    let store = await Store.findOne({ storeCode: storeIdOrCode }).exec();
+    if (!store) {
+      try {
+        store = await Store.findById(storeIdOrCode).exec();
+      } catch (_) {
+        // Invalid ObjectId, safe to ignore
+      }
+    }
+
+    if (!store) {
+      return false;
+    }
+
     const todayStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const now = new Date();
     const currentHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-    const todaysSchedules = await this.scheduleRepository.find({ storeId, date: todayStr });
+    const todaysSchedules = await this.scheduleRepository.find({ storeId: store._id.toString(), date: todayStr });
     return todaysSchedules.some(sch => {
       return currentHHMM >= sch.startTime && currentHHMM <= sch.endTime;
     });
