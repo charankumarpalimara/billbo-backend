@@ -73,22 +73,36 @@ export class WebSocketService {
     // check if the TV's store code (e.g. STR_102) has a registered client.
     if (!targetTvSocket) {
       try {
-        const tv = await this.tvService.getTVByTvCode(tvCode);
-        if (tv && tv.storeId) {
-          // 1. Try finding socket registered under storeId string
-          targetTvSocket = this.tvClients.get(tv.storeId.toString());
-
-          if (!targetTvSocket) {
-            // 2. Try finding socket registered under storeCode (e.g. STR_102)
-            const store = await Store.findById(tv.storeId).exec();
-            if (store && store.storeCode) {
-              targetTvSocket = this.tvClients.get(store.storeCode);
-              if (targetTvSocket) {
-                logger.info(`Fallback: Found client socket for TV "${tvCode}" registered under Store Code "${store.storeCode}"`);
-              }
+        // Fallback 1: If tvCode is a Store MongoDB ObjectId, resolve to storeCode
+        if (tvCode.match(/^[0-9a-fA-F]{24}$/)) {
+          const store = await Store.findById(tvCode).exec();
+          if (store && store.storeCode) {
+            targetTvSocket = this.tvClients.get(store.storeCode);
+            if (targetTvSocket) {
+              logger.info(`Fallback: Found client socket for Store ID "${tvCode}" registered under Store Code "${store.storeCode}"`);
             }
-          } else {
-            logger.info(`Fallback: Found client socket for TV "${tvCode}" registered under Store ID "${tv.storeId}"`);
+          }
+        }
+
+        // Fallback 2: Standard TV lookup in database
+        if (!targetTvSocket) {
+          const tv = await this.tvService.getTVByTvCode(tvCode);
+          if (tv && tv.storeId) {
+            // Try finding socket registered under storeId string
+            targetTvSocket = this.tvClients.get(tv.storeId.toString());
+
+            if (!targetTvSocket) {
+              // Try finding socket registered under storeCode (e.g. STR_102)
+              const store = await Store.findById(tv.storeId).exec();
+              if (store && store.storeCode) {
+                targetTvSocket = this.tvClients.get(store.storeCode);
+                if (targetTvSocket) {
+                  logger.info(`Fallback: Found client socket for TV "${tvCode}" registered under Store Code "${store.storeCode}"`);
+                }
+              }
+            } else {
+              logger.info(`Fallback: Found client socket for TV "${tvCode}" registered under Store ID "${tv.storeId}"`);
+            }
           }
         }
       } catch (err) {
