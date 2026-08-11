@@ -167,12 +167,28 @@ export class StoreScheduleService {
       return { isActive: false, currentSession: null, todaySchedules: [] };
     }
 
-    const todayStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const now = new Date();
-    const currentHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const dateParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).formatToParts(now);
+
+    const year = dateParts.find(p => p.type === 'year')?.value;
+    const month = dateParts.find(p => p.type === 'month')?.value;
+    const day = dateParts.find(p => p.type === 'day')?.value;
+    const hour = dateParts.find(p => p.type === 'hour')?.value;
+    const minute = dateParts.find(p => p.type === 'minute')?.value;
+
+    const todayStr = `${year}-${month}-${day}`;
+    const currentHHMM = `${hour}:${minute}`;
 
     const todaysSchedules = await this.scheduleRepository.find({ storeId: store._id.toString(), date: todayStr });
-    
+
     const currentSession = todaysSchedules.find(sch => {
       return currentHHMM >= sch.startTime && currentHHMM <= sch.endTime;
     }) || null;

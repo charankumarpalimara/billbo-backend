@@ -1,6 +1,7 @@
 import { WebSocket } from 'ws';
 import { TVService } from './TVService';
 import { Store } from '../models/Store';
+import { StoreScheduleService } from './StoreScheduleService';
 import { logger } from '../utils/logger';
 
 export class WebSocketService {
@@ -35,6 +36,9 @@ export class WebSocketService {
           case 'control_command':
             this.forwardControlCommand(data.tvCode, data.command, data.value, ws);
             break;
+          case 'get_screen_state':
+            await this.handleGetScreenState(data.tvCode, ws);
+            break;
           default:
             logger.warn(`Unknown WS event type: ${data.type}`);
         }
@@ -58,6 +62,17 @@ export class WebSocketService {
 
     await this.tvService.updateTVStatus(tvCode, 'online');
     this.broadcastToDashboards({ type: 'tv_status_change', tvCode, status: 'online' });
+
+    // Send the current active status of the store immediately on registration
+    try {
+      const scheduleService = new StoreScheduleService();
+      const statusInfo = await scheduleService.getStoreActiveStatus(tvCode);
+      const command = statusInfo.isActive ? 'screen_on' : 'screen_off';
+      ws.send(JSON.stringify({ type: 'command', command }));
+      logger.info(`Sent initial power command "${command}" to TV "${tvCode}" on registration`);
+    } catch (err) {
+      logger.error(`Failed to send initial active status on registration to TV "${tvCode}":`, err);
+    }
   }
 
   private registerDashboard(ws: WebSocket) {
@@ -133,6 +148,19 @@ export class WebSocketService {
       logger.warn(`Failed to send command: TV "${tvCode}" is offline`);
       console.log(`❌ [WEBSOCKET] Failed to forward command: TV "${tvCode}" is offline`);
       dashboardWs.send(JSON.stringify({ type: 'error', message: `TV ${tvCode} is offline.` }));
+    }
+  }
+
+  private async handleGetScreenState(tvCode: string, ws: WebSocket) {
+    if (!tvCode) return;
+    try {
+      const scheduleService = new StoreScheduleService();
+      const statusInfo = await scheduleService.getStoreActiveStatus(tvCode);
+      const command = statusInfo.isActive ? 'screen_on' : 'screen_off';
+      ws.send(JSON.stringify({ type: 'command', command }));
+      logger.info(`Responded to get_screen_state for TV "${tvCode}" with command "${command}"`);
+    } catch (err) {
+      logger.error(`Failed to handle get_screen_state for TV "${tvCode}":`, err);
     }
   }
 
