@@ -5,7 +5,7 @@ import { logger } from '../utils/logger';
 
 export class WebSocketService {
   private static instance: WebSocketService;
-  private tvClients = new Map<string, WebSocket>();
+  private tvClients = new Map<string, Set<WebSocket>>();
   private dashboardClients = new Set<WebSocket>();
   private tvService = new TVService();
 
@@ -50,8 +50,11 @@ export class WebSocketService {
 
   private async registerTV(tvCode: string, ws: WebSocket) {
     if (!tvCode) return;
-    this.tvClients.set(tvCode, ws);
-    logger.info(`TV Registered: ${tvCode}`);
+    if (!this.tvClients.has(tvCode)) {
+      this.tvClients.set(tvCode, new Set<WebSocket>());
+    }
+    this.tvClients.get(tvCode)!.add(ws);
+    logger.info(`TV Registered: ${tvCode} (Total connections: ${this.tvClients.get(tvCode)!.size})`);
 
     await this.tvService.updateTVStatus(tvCode, 'online');
     this.broadcastToDashboards({ type: 'tv_status_change', tvCode, status: 'online' });
@@ -67,41 +70,41 @@ export class WebSocketService {
   }
 
   private async forwardControlCommand(tvCode: string, command: string, value: any, dashboardWs: WebSocket) {
-    let targetTvSocket = this.tvClients.get(tvCode);
+    let targetSockets = this.tvClients.get(tvCode);
 
     // Fallback: If TV socket is not found directly by tvCode (e.g. TV-103),
     // check if the TV's store code (e.g. STR_102) has a registered client.
-    if (!targetTvSocket) {
+    if (!targetSockets || targetSockets.size === 0) {
       try {
         // Fallback 1: If tvCode is a Store MongoDB ObjectId, resolve to storeCode
         if (tvCode.match(/^[0-9a-fA-F]{24}$/)) {
           const store = await Store.findById(tvCode).exec();
           if (store && store.storeCode) {
-            targetTvSocket = this.tvClients.get(store.storeCode);
-            if (targetTvSocket) {
-              logger.info(`Fallback: Found client socket for Store ID "${tvCode}" registered under Store Code "${store.storeCode}"`);
+            targetSockets = this.tvClients.get(store.storeCode);
+            if (targetSockets && targetSockets.size > 0) {
+              logger.info(`Fallback: Found client sockets for Store ID "${tvCode}" registered under Store Code "${store.storeCode}"`);
             }
           }
         }
 
         // Fallback 2: Standard TV lookup in database
-        if (!targetTvSocket) {
+        if (!targetSockets || targetSockets.size === 0) {
           const tv = await this.tvService.getTVByTvCode(tvCode);
           if (tv && tv.storeId) {
             // Try finding socket registered under storeId string
-            targetTvSocket = this.tvClients.get(tv.storeId.toString());
+            targetSockets = this.tvClients.get(tv.storeId.toString());
 
-            if (!targetTvSocket) {
+            if (!targetSockets || targetSockets.size === 0) {
               // Try finding socket registered under storeCode (e.g. STR_102)
               const store = await Store.findById(tv.storeId).exec();
               if (store && store.storeCode) {
-                targetTvSocket = this.tvClients.get(store.storeCode);
-                if (targetTvSocket) {
-                  logger.info(`Fallback: Found client socket for TV "${tvCode}" registered under Store Code "${store.storeCode}"`);
+                targetSockets = this.tvClients.get(store.storeCode);
+                if (targetSockets && targetSockets.size > 0) {
+                  logger.info(`Fallback: Found client sockets for TV "${tvCode}" registered under Store Code "${store.storeCode}"`);
                 }
               }
             } else {
-              logger.info(`Fallback: Found client socket for TV "${tvCode}" registered under Store ID "${tv.storeId}"`);
+              logger.info(`Fallback: Found client sockets for TV "${tvCode}" registered under Store ID "${tv.storeId}"`);
             }
           }
         }
@@ -110,10 +113,22 @@ export class WebSocketService {
       }
     }
 
-    if (targetTvSocket && targetTvSocket.readyState === WebSocket.OPEN) {
-      targetTvSocket.send(JSON.stringify({ type: 'command', command, value }));
-      logger.info(`Forwarded command "${command}" to TV "${tvCode}"`);
-      console.log(`⚡ [WEBSOCKET] Successfully forwarded command "${command}" to TV "${tvCode}"`);
+    if (targetSockets && targetSockets.size > 0) {
+      let sentCount = 0;
+      targetSockets.forEach(socket => {
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({ type: 'command', command, value }));
+          sentCount++;
+        }
+      });
+      if (sentCount > 0) {
+        logger.info(`Forwarded command "${command}" to ${sentCount} client(s) for TV/Store "${tvCode}"`);
+        console.log(`⚡ [WEBSOCKET] Successfully forwarded command "${command}" to ${sentCount} client(s) for TV/Store "${tvCode}"`);
+      } else {
+        logger.warn(`Failed to send command: All clients for TV "${tvCode}" are offline`);
+        console.log(`❌ [WEBSOCKET] Failed to forward command: All clients for TV "${tvCode}" are offline`);
+        dashboardWs.send(JSON.stringify({ type: 'error', message: `TV ${tvCode} is offline.` }));
+      }
     } else {
       logger.warn(`Failed to send command: TV "${tvCode}" is offline`);
       console.log(`❌ [WEBSOCKET] Failed to forward command: TV "${tvCode}" is offline`);
@@ -122,12 +137,16 @@ export class WebSocketService {
   }
 
   private handleClose(ws: WebSocket) {
-    for (const [tvCode, socket] of this.tvClients.entries()) {
-      if (socket === ws) {
-        this.tvClients.delete(tvCode);
-        logger.info(`TV connection closed: ${tvCode}`);
-        this.tvService.updateTVStatus(tvCode, 'offline');
-        this.broadcastToDashboards({ type: 'tv_status_change', tvCode, status: 'offline' });
+    for (const [tvCode, socketSet] of this.tvClients.entries()) {
+      if (socketSet.has(ws)) {
+        socketSet.delete(ws);
+        logger.info(`Closed a client connection for TV: ${tvCode}`);
+        if (socketSet.size === 0) {
+          this.tvClients.delete(tvCode);
+          logger.info(`All connections closed for TV: ${tvCode}`);
+          this.tvService.updateTVStatus(tvCode, 'offline');
+          this.broadcastToDashboards({ type: 'tv_status_change', tvCode, status: 'offline' });
+        }
         break;
       }
     }
