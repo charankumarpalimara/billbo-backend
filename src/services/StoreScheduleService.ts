@@ -178,7 +178,7 @@ export class StoreScheduleService {
     }) || null;
 
     return {
-      isActive: currentSession !== null,
+      isActive: store.screenPowerStatus !== 'off' && currentSession !== null,
       currentSession,
       todaySchedules: todaysSchedules
     };
