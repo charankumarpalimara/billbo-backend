@@ -19,21 +19,21 @@ export interface ITV {
 }
 
 export class TV extends Model<ITV> implements ITV {
-  public id!: number;
+  declare public id: number;
   public get _id(): number {
     return this.id;
   }
-  public tvCode!: string;
-  public name!: string;
-  public storeId!: number;
-  public status!: 'online' | 'offline';
-  public lastSeen?: Date;
-  public serialNumber?: string;
-  public brand?: string;
-  public purchaseDate?: string;
-  public notes?: string;
-  public readonly createdAt!: Date;
-  public readonly updatedAt!: Date;
+  declare public tvCode: string;
+  declare public name: string;
+  declare public storeId: number;
+  declare public status: 'online' | 'offline';
+  declare public lastSeen?: Date;
+  declare public serialNumber?: string;
+  declare public brand?: string;
+  declare public purchaseDate?: string;
+  declare public notes?: string;
+  declare public readonly createdAt: Date;
+  declare public readonly updatedAt: Date;
 }
 
 TV.init({

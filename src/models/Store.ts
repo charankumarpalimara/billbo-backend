@@ -13,16 +13,16 @@ export interface IStore {
 }
 
 export class Store extends Model<IStore> implements IStore {
-  public id!: number;
+  declare public id: number;
   public get _id(): number {
     return this.id;
   }
-  public name!: string;
-  public location!: string;
-  public storeCode?: string;
-  public screenPowerStatus?: 'on' | 'off';
-  public readonly createdAt!: Date;
-  public readonly updatedAt!: Date;
+  declare public name: string;
+  declare public location: string;
+  declare public storeCode?: string;
+  declare public screenPowerStatus?: 'on' | 'off';
+  declare public readonly createdAt: Date;
+  declare public readonly updatedAt: Date;
 }
 
 Store.init({

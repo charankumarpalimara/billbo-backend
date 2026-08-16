@@ -15,17 +15,17 @@ export interface IStoreSchedule {
 }
 
 export class StoreSchedule extends Model<IStoreSchedule> implements IStoreSchedule {
-  public id!: number;
+  declare public id: number;
   public get _id(): number {
     return this.id;
   }
-  public storeId!: number;
-  public date!: string;
-  public startTime!: string;
-  public endTime!: string;
-  public scheduleCode?: string;
-  public readonly createdAt!: Date;
-  public readonly updatedAt!: Date;
+  declare public storeId: number;
+  declare public date: string;
+  declare public startTime: string;
+  declare public endTime: string;
+  declare public scheduleCode?: string;
+  declare public readonly createdAt: Date;
+  declare public readonly updatedAt: Date;
 }
 
 StoreSchedule.init({

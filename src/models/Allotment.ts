@@ -14,15 +14,15 @@ export interface IAllotment {
 }
 
 export class Allotment extends Model<IAllotment> implements IAllotment {
-  public id!: number;
+  declare public id: number;
   public get _id(): number {
     return this.id;
   }
-  public storeId!: number;
-  public allotmentCode?: string;
-  public adIds?: any[];
-  public readonly createdAt!: Date;
-  public readonly updatedAt!: Date;
+  declare public storeId: number;
+  declare public allotmentCode?: string;
+  declare public adIds?: any[];
+  declare public readonly createdAt: Date;
+  declare public readonly updatedAt: Date;
 }
 
 Allotment.init({
