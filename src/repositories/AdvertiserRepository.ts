@@ -1,12 +1,12 @@
 import { BaseRepository } from './BaseRepository';
-import { Advertiser, IAdvertiser } from '../models/Advertiser';
+import { Advertiser } from '../models/Advertiser';
 
-export class AdvertiserRepository extends BaseRepository<IAdvertiser> {
+export class AdvertiserRepository extends BaseRepository<Advertiser> {
   constructor() {
     super(Advertiser);
   }
 
-  async findAllSortedByCreated(): Promise<IAdvertiser[]> {
-    return await this.model.find().sort({ createdAt: -1 }).exec();
+  async findAllSortedByCreated(): Promise<Advertiser[]> {
+    return await this.model.findAll({ order: [['createdAt', 'DESC']] });
   }
 }

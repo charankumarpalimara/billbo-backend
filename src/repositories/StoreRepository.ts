@@ -1,12 +1,12 @@
 import { BaseRepository } from './BaseRepository';
-import { Store, IStore } from '../models/Store';
+import { Store } from '../models/Store';
 
-export class StoreRepository extends BaseRepository<IStore> {
+export class StoreRepository extends BaseRepository<Store> {
   constructor() {
     super(Store);
   }
 
-  async findAllSortedByCreated(): Promise<IStore[]> {
-    return await this.model.find().sort({ createdAt: -1 }).exec();
+  async findAllSortedByCreated(): Promise<Store[]> {
+    return await this.model.findAll({ order: [['createdAt', 'DESC']] });
   }
 }

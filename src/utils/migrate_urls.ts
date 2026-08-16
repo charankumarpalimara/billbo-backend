@@ -1,18 +1,16 @@
-import mongoose from 'mongoose';
+import { sequelize } from '../config/db';
 import { Ad } from '../models/Ad';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-const MONGO_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/androidtv_db';
-
 async function migrate() {
   console.log('Connecting to database...');
-  await mongoose.connect(MONGO_URI);
+  await sequelize.authenticate();
   console.log('Connected!');
 
-  const ads = await Ad.find({}).exec();
+  const ads = await Ad.findAll();
   console.log(`Found ${ads.length} ads. Updating URLs...`);
 
   for (const ad of ads) {
@@ -29,7 +27,6 @@ async function migrate() {
       await ad.save();
       console.log('Updated AD_103 to direct mp4 link.');
     } else if (ad.youtubeUrl.includes('youtube.com') || ad.youtubeUrl.includes('youtu.be')) {
-      // Fallback fallback link for generic youtube links
       ad.youtubeUrl = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
       await ad.save();
       console.log(`Updated ad "${ad.title}" to generic direct mp4 link.`);
@@ -37,10 +34,11 @@ async function migrate() {
   }
 
   console.log('Migration completed successfully!');
-  await mongoose.disconnect();
+  await sequelize.close();
 }
 
-migrate().catch(err => {
+migrate().catch(async err => {
   console.error('Migration failed:', err);
+  await sequelize.close();
   process.exit(1);
 });

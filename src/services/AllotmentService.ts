@@ -22,21 +22,23 @@ export class AllotmentService {
 
   async getPlaylistByTvCode(tvCode: string): Promise<IAd[]> {
     // 1. Check if the incoming tvCode is a Store Code (e.g. "STR_102")
-    let store = await Store.findOne({ storeCode: tvCode }).exec();
+    let store = await Store.findOne({ where: { storeCode: tvCode } });
     
-    // 2. If not found, try searching by Store MongoDB _id directly
+    // 2. If not found, try searching by Store Primary Key (ID) directly
     if (!store) {
       try {
-        store = await Store.findById(tvCode).exec();
+        if (/^\d+$/.test(tvCode)) {
+          store = await Store.findByPk(parseInt(tvCode));
+        }
       } catch (_) {
-        // Invalid ObjectId format, safe to ignore
+        // Safe to ignore
       }
     }
 
     // 3. If still not found, fallback to checking if it is a TV Code and finding its store
     let storeIdVal: string;
     if (store) {
-      storeIdVal = store._id.toString();
+      storeIdVal = store.id.toString();
     } else {
       const tv = await this.tvRepository.findByTvCode(tvCode);
       if (!tv) {

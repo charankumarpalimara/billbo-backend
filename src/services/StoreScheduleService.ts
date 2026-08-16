@@ -10,7 +10,7 @@ export class StoreScheduleService {
   }
 
   async getSchedulesPaginated(page: number, limit: number, storeId = '', search = ''): Promise<{ data: IStoreSchedule[]; total: number }> {
-    const filter = storeId ? { storeId } : {};
+    const filter = storeId ? { storeId: parseInt(storeId) } : {};
     return await this.scheduleRepository.findPaginatedPopulated(page, limit, filter, search);
   }
 
@@ -37,7 +37,7 @@ export class StoreScheduleService {
       dates.push(startDate);
     }
 
-    const allExisting = await this.scheduleRepository.find({ storeId, date: { $in: dates } });
+    const allExisting = await this.scheduleRepository.find({ storeId: parseInt(storeId), date: { $in: dates } });
 
     for (let i = 0; i < sessions.length; i++) {
       const s1 = sessions[i];
@@ -80,7 +80,7 @@ export class StoreScheduleService {
       for (const sess of sessions) {
         const code = `SCH_${nextNum++}`;
         const newSch = await this.scheduleRepository.create({
-          storeId: storeId as any,
+          storeId: parseInt(storeId),
           date,
           startTime: sess.startTime,
           endTime: sess.endTime,
@@ -99,7 +99,7 @@ export class StoreScheduleService {
     }
 
     // Check for overlap on the same date for the same store
-    const existing = await this.scheduleRepository.find({ storeId: data.storeId, date: data.date });
+    const existing = await this.scheduleRepository.find({ storeId: parseInt(data.storeId.toString()), date: data.date });
     const isOverlap = existing.some(sch => {
       return data.startTime! < sch.endTime && sch.startTime < data.endTime!;
     });
@@ -119,14 +119,14 @@ export class StoreScheduleService {
     });
 
     const code = `SCH_${nextNum}`;
-    return await this.scheduleRepository.create({ ...data, scheduleCode: code });
+    return await this.scheduleRepository.create({ ...data, storeId: parseInt(data.storeId.toString()), scheduleCode: code });
   }
 
   async updateSchedule(id: string, data: Partial<IStoreSchedule>): Promise<IStoreSchedule | null> {
-    const current = await this.scheduleRepository.findById(id);
+    const current = await this.scheduleRepository.findById(parseInt(id));
     if (!current) throw new Error('Schedule not found');
 
-    const storeId = data.storeId || current.storeId;
+    const storeId = data.storeId ? parseInt(data.storeId.toString()) : current.storeId;
     const date = data.date || current.date;
     const startTime = data.startTime || current.startTime;
     const endTime = data.endTime || current.endTime;
@@ -134,18 +134,21 @@ export class StoreScheduleService {
     // Check overlap excluding this schedule
     const existing = await this.scheduleRepository.find({ storeId, date });
     const isOverlap = existing.some(sch => {
-      if (sch._id.toString() === id) return false;
+      if (sch.id.toString() === id) return false;
       return startTime < sch.endTime && sch.startTime < endTime;
     });
     if (isOverlap) {
       throw new Error('Schedule timing overlaps with an existing session on this date.');
     }
 
-    return await this.scheduleRepository.update(id, data);
+    return await this.scheduleRepository.update(parseInt(id), {
+      ...data,
+      ...(data.storeId ? { storeId: parseInt(data.storeId.toString()) } : {})
+    });
   }
 
   async deleteSchedule(id: string): Promise<IStoreSchedule | null> {
-    return await this.scheduleRepository.delete(id);
+    return await this.scheduleRepository.delete(parseInt(id));
   }
 
   // Active status check: checks if current local time is within any session today, and returns the details
@@ -154,12 +157,14 @@ export class StoreScheduleService {
     currentSession: IStoreSchedule | null;
     todaySchedules: IStoreSchedule[];
   }> {
-    let store = await Store.findOne({ storeCode: storeIdOrCode }).exec();
+    let store = await Store.findOne({ where: { storeCode: storeIdOrCode } });
     if (!store) {
       try {
-        store = await Store.findById(storeIdOrCode).exec();
+        if (/^\d+$/.test(storeIdOrCode)) {
+          store = await Store.findByPk(parseInt(storeIdOrCode));
+        }
       } catch (_) {
-        // Invalid ObjectId, safe to ignore
+        // Safe to ignore
       }
     }
 
@@ -187,7 +192,7 @@ export class StoreScheduleService {
     const todayStr = `${year}-${month}-${day}`;
     const currentHHMM = `${hour}:${minute}`;
 
-    const todaysSchedules = await this.scheduleRepository.find({ storeId: store._id.toString(), date: todayStr });
+    const todaysSchedules = await this.scheduleRepository.find({ storeId: store.id, date: todayStr });
 
     const currentSession = todaysSchedules.find(sch => {
       return currentHHMM >= sch.startTime && currentHHMM <= sch.endTime;

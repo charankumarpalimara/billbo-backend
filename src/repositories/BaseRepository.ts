@@ -1,45 +1,78 @@
-import { Model, Document, FilterQuery, UpdateQuery } from 'mongoose';
+import { Model, ModelStatic, Op } from 'sequelize';
 
-export class BaseRepository<T> {
-  protected model: Model<T>;
+export class BaseRepository<T extends Model> {
+  protected model: ModelStatic<T>;
 
-  constructor(model: Model<T>) {
+  constructor(model: ModelStatic<T>) {
     this.model = model;
   }
 
-  async create(item: Partial<T>): Promise<T> {
-    const created = new this.model(item);
-    return await created.save() as T;
+  async create(item: any): Promise<any> {
+    return await this.model.create(item);
   }
 
-  async find(filter: FilterQuery<T> = {}): Promise<T[]> {
-    return await this.model.find(filter).exec() as T[];
+  async find(filter: any = {}): Promise<any[]> {
+    const where = this.mapFilter(filter);
+    return await this.model.findAll({ where });
   }
 
-  async findOne(filter: FilterQuery<T>): Promise<T | null> {
-    return await this.model.findOne(filter).exec() as T | null;
+  async findOne(filter: any): Promise<any | null> {
+    const where = this.mapFilter(filter);
+    return await this.model.findOne({ where });
   }
 
-  async findById(id: string): Promise<T | null> {
-    return await this.model.findById(id).exec() as T | null;
+  async findById(id: any): Promise<any | null> {
+    return await this.model.findByPk(id);
   }
 
-  async update(id: string, item: UpdateQuery<T>): Promise<T | null> {
-    return await this.model.findByIdAndUpdate(id, item, { new: true }).exec() as T | null;
+  async update(id: any, item: any): Promise<any | null> {
+    const instance = await this.model.findByPk(id);
+    if (!instance) return null;
+    await instance.update(item);
+    return instance;
   }
 
-  async delete(id: string): Promise<T | null> {
-    return await this.model.findByIdAndDelete(id).exec() as T | null;
+  async delete(id: any): Promise<any | null> {
+    const instance = await this.model.findByPk(id);
+    if (!instance) return null;
+    await instance.destroy();
+    return instance;
   }
 
-  async count(filter: FilterQuery<T> = {}): Promise<number> {
-    return await this.model.countDocuments(filter).exec();
+  async count(filter: any = {}): Promise<number> {
+    const where = this.mapFilter(filter);
+    return await this.model.count({ where });
   }
 
-  async findPaginated(filter: FilterQuery<T> = {}, page: number, limit: number): Promise<{ data: T[]; total: number }> {
+  async findPaginated(filter: any = {}, page: number, limit: number): Promise<{ data: any[]; total: number }> {
     const skip = (page - 1) * limit;
-    const total = await this.model.countDocuments(filter).exec();
-    const data = await this.model.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).exec() as T[];
-    return { data, total };
+    const where = this.mapFilter(filter);
+    const { rows, count } = await this.model.findAndCountAll({
+      where,
+      offset: skip,
+      limit,
+      order: [['createdAt', 'DESC']],
+    });
+    return { data: rows, total: count };
+  }
+
+  protected mapFilter(filter: any): any {
+    if (!filter) return {};
+    const mapped: any = {};
+    for (const key of Object.keys(filter)) {
+      const val = filter[key];
+      if (val && typeof val === 'object' && !Array.isArray(val) && !(val instanceof Date)) {
+        if ('$in' in val) {
+          mapped[key] = val.$in;
+        } else if ('$regex' in val) {
+          mapped[key] = { [Op.like]: `%${val.$regex}%` };
+        } else {
+          mapped[key] = val;
+        }
+      } else {
+        mapped[key] = val;
+      }
+    }
+    return mapped;
   }
 }

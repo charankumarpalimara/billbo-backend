@@ -1,19 +1,68 @@
-import { Schema, model, Document } from 'mongoose';
+import { DataTypes, Model } from 'sequelize';
+import { sequelize } from '../config/db';
+import { Store } from './Store';
 
-export interface IStoreSchedule extends Document {
-  storeId: Schema.Types.ObjectId;
-  date: string; // YYYY-MM-DD
-  startTime: string; // HH:mm
-  endTime: string; // HH:mm
+export interface IStoreSchedule {
+  id?: number;
+  _id?: any;
+  storeId: number | any;
+  date: string;
+  startTime: string;
+  endTime: string;
   scheduleCode?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
-const storeScheduleSchema = new Schema<IStoreSchedule>({
-  storeId: { type: Schema.Types.ObjectId, ref: 'Store', required: true },
-  date: { type: String, required: true, trim: true },
-  startTime: { type: String, required: true, trim: true },
-  endTime: { type: String, required: true, trim: true },
-  scheduleCode: { type: String, unique: true, sparse: true, trim: true }
-}, { timestamps: true });
+export class StoreSchedule extends Model<IStoreSchedule> implements IStoreSchedule {
+  public id!: number;
+  public get _id(): number {
+    return this.id;
+  }
+  public storeId!: number;
+  public date!: string;
+  public startTime!: string;
+  public endTime!: string;
+  public scheduleCode?: string;
+  public readonly createdAt!: Date;
+  public readonly updatedAt!: Date;
+}
 
-export const StoreSchedule = model<IStoreSchedule>('StoreSchedule', storeScheduleSchema);
+StoreSchedule.init({
+  id: {
+    type: DataTypes.INTEGER,
+    autoIncrement: true,
+    primaryKey: true,
+  },
+  storeId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: Store,
+      key: 'id'
+    }
+  },
+  date: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  startTime: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  endTime: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  scheduleCode: {
+    type: DataTypes.STRING,
+    unique: true,
+    allowNull: true,
+  }
+}, {
+  sequelize,
+  modelName: 'StoreSchedule',
+});
+
+StoreSchedule.belongsTo(Store, { foreignKey: 'storeId', as: 'store' });
+Store.hasMany(StoreSchedule, { foreignKey: 'storeId', as: 'schedules' });

@@ -1,13 +1,13 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import http from 'http';
 import { WebSocketServer } from 'ws';
-import dotenv from 'dotenv';
 import app from './app';
 import { connectDB } from './config/db';
 import { seedDatabase } from './utils/seeder';
 import { WebSocketService } from './services/WebSocketService';
 import { logger } from './utils/logger';
-
-dotenv.config();
 
 const PORT = process.env.PORT || 5001;
 

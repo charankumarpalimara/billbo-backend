@@ -1,49 +1,60 @@
 import { BaseRepository } from './BaseRepository';
-import { Allotment, IAllotment } from '../models/Allotment';
+import { Allotment, AllotmentAd } from '../models/Allotment';
+import { Store } from '../models/Store';
+import { Ad } from '../models/Ad';
+import { Advertiser } from '../models/Advertiser';
 
-export class AllotmentRepository extends BaseRepository<IAllotment> {
+export class AllotmentRepository extends BaseRepository<Allotment> {
   constructor() {
     super(Allotment);
   }
 
-  async findAllPopulated(): Promise<IAllotment[]> {
-    return await this.model.find()
-      .populate('storeId')
-      .populate('adIds')
-      .exec();
+  async findAllPopulated(): Promise<Allotment[]> {
+    return await this.model.findAll({
+      include: [
+        { model: Store, as: 'store' },
+        { model: Ad, as: 'adIds' }
+      ]
+    });
   }
 
-  async findPaginatedPopulated(page: number, limit: number): Promise<{ data: IAllotment[]; total: number }> {
+  async findPaginatedPopulated(page: number, limit: number): Promise<{ data: Allotment[]; total: number }> {
     const skip = (page - 1) * limit;
-    const total = await this.model.countDocuments({}).exec();
-    const data = await this.model.find()
-      .populate('storeId')
-      .populate('adIds')
-      .skip(skip)
-      .limit(limit)
-      .exec();
-    return { data, total };
+    const { rows, count } = await this.model.findAndCountAll({
+      include: [
+        { model: Store, as: 'store' },
+        { model: Ad, as: 'adIds' }
+      ],
+      offset: skip,
+      limit,
+      distinct: true
+    });
+    return { data: rows, total: count };
   }
 
-  async findByStoreIdPopulated(storeId: string): Promise<IAllotment | null> {
-    return await this.model.findOne({ storeId })
-      .populate({
-        path: 'adIds',
-        populate: { path: 'advertiserId' }
-      })
-      .exec();
+  async findByStoreIdPopulated(storeId: string | number): Promise<Allotment | null> {
+    return await this.model.findOne({
+      where: { storeId },
+      include: [
+        {
+          model: Ad,
+          as: 'adIds',
+          include: [{ model: Advertiser, as: 'advertiser' }]
+        }
+      ]
+    });
   }
 
-  async upsertAllotment(storeId: string, adIds: string[]): Promise<IAllotment | null> {
-    const existing = await this.model.findOne({ storeId }).exec();
-    if (existing) {
-      return await this.model.findOneAndUpdate(
-        { storeId },
-        { adIds },
-        { new: true }
-      ).exec();
+  async upsertAllotment(storeId: string | number, adIds: any[]): Promise<Allotment | null> {
+    let allotment = await this.model.findOne({ where: { storeId } });
+
+    const numericAdIds = adIds.map(id => parseInt(id.toString()));
+
+    if (allotment) {
+      await (allotment as any).setAdIds(numericAdIds);
+      return allotment;
     } else {
-      const allotments = await this.model.find({}).exec();
+      const allotments = await this.model.findAll();
       let nextNum = 101;
       allotments.forEach(a => {
         if (a.allotmentCode && a.allotmentCode.startsWith('ALT_')) {
@@ -54,19 +65,20 @@ export class AllotmentRepository extends BaseRepository<IAllotment> {
         }
       });
       const code = `ALT_${nextNum}`;
-      return await this.model.findOneAndUpdate(
-        { storeId },
-        { adIds, allotmentCode: code },
-        { upsert: true, new: true }
-      ).exec();
+      allotment = await this.model.create({
+        storeId: parseInt(storeId.toString()),
+        allotmentCode: code
+      });
+      await (allotment as any).setAdIds(numericAdIds);
+      return allotment;
     }
   }
 
-  async removeAdFromAllotments(adId: string): Promise<any> {
-    return await this.model.updateMany({}, { $pull: { adIds: adId } }).exec();
+  async removeAdFromAllotments(adId: string | number): Promise<any> {
+    return await AllotmentAd.destroy({ where: { adId: parseInt(adId.toString()) } });
   }
 
-  async deleteByStoreId(storeId: string): Promise<any> {
-    return await this.model.deleteOne({ storeId }).exec();
+  async deleteByStoreId(storeId: string | number): Promise<any> {
+    return await this.model.destroy({ where: { storeId } });
   }
 }

@@ -1,28 +1,92 @@
-import { Schema, model, Types } from 'mongoose';
+import { DataTypes, Model } from 'sequelize';
+import { sequelize } from '../config/db';
+import { Store } from './Store';
 
 export interface ITV {
+  id?: number;
   _id?: any;
   tvCode: string;
   name: string;
-  storeId: Types.ObjectId;
+  storeId: number | any;
   status: 'online' | 'offline';
   lastSeen?: Date;
   serialNumber?: string;
   brand?: string;
   purchaseDate?: string;
   notes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
-const tvSchema = new Schema<ITV>({
-  tvCode: { type: String, required: true, unique: true, trim: true },
-  name: { type: String, required: true, trim: true },
-  storeId: { type: Schema.Types.ObjectId, ref: 'Store', required: true },
-  status: { type: String, enum: ['online', 'offline'], default: 'offline' },
-  lastSeen: { type: Date },
-  serialNumber: { type: String, trim: true },
-  brand: { type: String, trim: true },
-  purchaseDate: { type: String, trim: true },
-  notes: { type: String, trim: true }
-}, { timestamps: true });
+export class TV extends Model<ITV> implements ITV {
+  public id!: number;
+  public get _id(): number {
+    return this.id;
+  }
+  public tvCode!: string;
+  public name!: string;
+  public storeId!: number;
+  public status!: 'online' | 'offline';
+  public lastSeen?: Date;
+  public serialNumber?: string;
+  public brand?: string;
+  public purchaseDate?: string;
+  public notes?: string;
+  public readonly createdAt!: Date;
+  public readonly updatedAt!: Date;
+}
 
-export const TV = model<ITV>('TV', tvSchema);
+TV.init({
+  id: {
+    type: DataTypes.INTEGER,
+    autoIncrement: true,
+    primaryKey: true,
+  },
+  tvCode: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true,
+  },
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  storeId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: Store,
+      key: 'id'
+    }
+  },
+  status: {
+    type: DataTypes.ENUM('online', 'offline'),
+    defaultValue: 'offline',
+  },
+  lastSeen: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  serialNumber: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  brand: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  purchaseDate: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  notes: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  }
+}, {
+  sequelize,
+  modelName: 'TV',
+});
+
+TV.belongsTo(Store, { foreignKey: 'storeId', as: 'store' });
+Store.hasMany(TV, { foreignKey: 'storeId', as: 'tvs' });

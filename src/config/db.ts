@@ -1,12 +1,26 @@
-import mongoose from 'mongoose';
+import { Sequelize } from 'sequelize';
+
+export const sequelize = new Sequelize(
+  process.env.DB_NAME || 'androidtv_db',
+  process.env.DB_USER || 'root',
+  process.env.DB_PASS || '',
+  {
+    host: process.env.DB_HOST || '127.0.0.1',
+    port: parseInt(process.env.DB_PORT || '3306'),
+    dialect: 'mysql',
+    logging: false,
+  }
+);
 
 export const connectDB = async (): Promise<void> => {
-  const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/androidtv_db';
   try {
-    await mongoose.connect(MONGODB_URI);
-    console.log('MongoDB connected successfully');
+    await sequelize.authenticate();
+    console.log('MySQL connected successfully via Sequelize');
+    // We will call sync() after defining all relations in server.ts or after seeding
+    await sequelize.sync({ alter: true });
+    console.log('Database schemas synced successfully');
   } catch (err) {
-    console.error('MongoDB connection error:', err);
+    console.error('MySQL connection/sync error:', err);
     process.exit(1);
   }
 };

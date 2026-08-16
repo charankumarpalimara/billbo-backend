@@ -1,19 +1,68 @@
-import { Schema, model, Types } from 'mongoose';
+import { DataTypes, Model } from 'sequelize';
+import { sequelize } from '../config/db';
+import { Advertiser } from './Advertiser';
 
 export interface IAd {
+  id?: number;
+  _id?: any;
   title: string;
   youtubeUrl: string;
-  duration?: number; // in seconds
-  advertiserId: Types.ObjectId;
+  duration?: number;
+  advertiserId: number | any;
   adCode?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
-const adSchema = new Schema<IAd>({
-  title: { type: String, required: true, trim: true },
-  youtubeUrl: { type: String, required: true, trim: true },
-  duration: { type: Number, default: 30 },
-  advertiserId: { type: Schema.Types.ObjectId, ref: 'Advertiser', required: true },
-  adCode: { type: String, unique: true, sparse: true, trim: true }
-}, { timestamps: true });
+export class Ad extends Model<IAd> implements IAd {
+  public id!: number;
+  public get _id(): number {
+    return this.id;
+  }
+  public title!: string;
+  public youtubeUrl!: string;
+  public duration!: number;
+  public advertiserId!: number;
+  public adCode?: string;
+  public readonly createdAt!: Date;
+  public readonly updatedAt!: Date;
+}
 
-export const Ad = model<IAd>('Ad', adSchema);
+Ad.init({
+  id: {
+    type: DataTypes.INTEGER,
+    autoIncrement: true,
+    primaryKey: true,
+  },
+  title: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  youtubeUrl: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  duration: {
+    type: DataTypes.INTEGER,
+    defaultValue: 30,
+  },
+  advertiserId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: Advertiser,
+      key: 'id'
+    }
+  },
+  adCode: {
+    type: DataTypes.STRING,
+    unique: true,
+    allowNull: true,
+  }
+}, {
+  sequelize,
+  modelName: 'Ad',
+});
+
+Ad.belongsTo(Advertiser, { foreignKey: 'advertiserId', as: 'advertiser' });
+Advertiser.hasMany(Ad, { foreignKey: 'advertiserId', as: 'ads' });

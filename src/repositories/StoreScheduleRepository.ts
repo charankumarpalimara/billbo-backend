@@ -1,13 +1,18 @@
 import { BaseRepository } from './BaseRepository';
-import { StoreSchedule, IStoreSchedule } from '../models/StoreSchedule';
+import { StoreSchedule } from '../models/StoreSchedule';
+import { Store } from '../models/Store';
+import { Op } from 'sequelize';
 
-export class StoreScheduleRepository extends BaseRepository<IStoreSchedule> {
+export class StoreScheduleRepository extends BaseRepository<StoreSchedule> {
   constructor() {
     super(StoreSchedule);
   }
 
-  async findAllPopulated(): Promise<IStoreSchedule[]> {
-    return await this.model.find().populate('storeId').sort({ date: -1, startTime: 1 }).exec();
+  async findAllPopulated(): Promise<StoreSchedule[]> {
+    return await this.model.findAll({
+      include: [{ model: Store, as: 'store' }],
+      order: [['date', 'DESC'], ['startTime', 'ASC']]
+    });
   }
 
   async findPaginatedPopulated(
@@ -15,26 +20,26 @@ export class StoreScheduleRepository extends BaseRepository<IStoreSchedule> {
     limit: number,
     filter: any = {},
     search = ''
-  ): Promise<{ data: IStoreSchedule[]; total: number }> {
+  ): Promise<{ data: StoreSchedule[]; total: number }> {
     const skip = (page - 1) * limit;
-    const query: any = { ...filter };
+    const whereClause = this.mapFilter(filter);
 
     if (search) {
-      query.$or = [
-        { scheduleCode: { $regex: search, $options: 'i' } },
-        { date: { $regex: search, $options: 'i' } },
-        { startTime: { $regex: search, $options: 'i' } },
-        { endTime: { $regex: search, $options: 'i' } },
+      whereClause[Op.or] = [
+        { scheduleCode: { [Op.like]: `%${search}%` } },
+        { date: { [Op.like]: `%${search}%` } },
+        { startTime: { [Op.like]: `%${search}%` } },
+        { endTime: { [Op.like]: `%${search}%` } }
       ];
     }
 
-    const total = await this.model.countDocuments(query).exec();
-    const data = await this.model.find(query)
-      .populate('storeId')
-      .sort({ date: -1, startTime: 1 })
-      .skip(skip)
-      .limit(limit)
-      .exec();
-    return { data, total };
+    const { rows, count } = await this.model.findAndCountAll({
+      where: whereClause,
+      include: [{ model: Store, as: 'store' }],
+      offset: skip,
+      limit,
+      order: [['date', 'DESC'], ['startTime', 'ASC']]
+    });
+    return { data: rows, total: count };
   }
 }

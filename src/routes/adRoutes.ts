@@ -12,6 +12,7 @@ const upload = multer({
 });
 
 router.get('/', controller.getAds);
+router.get('/download/:id', controller.downloadAd);
 router.post('/', upload.single('file'), controller.createAd);
 router.put('/:id', upload.single('file'), controller.updateAd);
 router.delete('/:id', controller.deleteAd);

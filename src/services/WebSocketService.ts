@@ -91,9 +91,9 @@ export class WebSocketService {
     // check if the TV's store code (e.g. STR_102) has a registered client.
     if (!targetSockets || targetSockets.size === 0) {
       try {
-        // Fallback 1: If tvCode is a Store MongoDB ObjectId, resolve to storeCode
-        if (tvCode.match(/^[0-9a-fA-F]{24}$/)) {
-          const store = await Store.findById(tvCode).exec();
+        // Fallback 1: If tvCode is numeric, resolve to storeCode
+        if (tvCode.match(/^\d+$/)) {
+          const store = await Store.findByPk(parseInt(tvCode));
           if (store && store.storeCode) {
             targetSockets = this.tvClients.get(store.storeCode);
             if (targetSockets && targetSockets.size > 0) {
@@ -111,7 +111,7 @@ export class WebSocketService {
 
             if (!targetSockets || targetSockets.size === 0) {
               // Try finding socket registered under storeCode (e.g. STR_102)
-              const store = await Store.findById(tv.storeId).exec();
+              const store = await Store.findByPk(tv.storeId);
               if (store && store.storeCode) {
                 targetSockets = this.tvClients.get(store.storeCode);
                 if (targetSockets && targetSockets.size > 0) {

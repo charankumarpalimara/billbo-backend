@@ -1,23 +1,33 @@
 import { BaseRepository } from './BaseRepository';
-import { Ad, IAd } from '../models/Ad';
+import { Ad } from '../models/Ad';
+import { Advertiser } from '../models/Advertiser';
 
-export class AdRepository extends BaseRepository<IAd> {
+export class AdRepository extends BaseRepository<Ad> {
   constructor() {
     super(Ad);
   }
 
-  async findAllWithAdvertiser(): Promise<IAd[]> {
-    return await this.model.find().populate('advertiserId').sort({ createdAt: -1 }).exec();
+  async findAllWithAdvertiser(): Promise<Ad[]> {
+    return await this.model.findAll({
+      include: [{ model: Advertiser, as: 'advertiser' }],
+      order: [['createdAt', 'DESC']]
+    });
   }
 
-  async findPaginatedWithAdvertiser(page: number, limit: number): Promise<{ data: IAd[]; total: number }> {
+  async findPaginatedWithAdvertiser(page: number, limit: number): Promise<{ data: Ad[]; total: number }> {
     const skip = (page - 1) * limit;
-    const total = await this.model.countDocuments({}).exec();
-    const data = await this.model.find().populate('advertiserId').sort({ createdAt: -1 }).skip(skip).limit(limit).exec();
-    return { data, total };
+    const { rows, count } = await this.model.findAndCountAll({
+      include: [{ model: Advertiser, as: 'advertiser' }],
+      offset: skip,
+      limit,
+      order: [['createdAt', 'DESC']]
+    });
+    return { data: rows, total: count };
   }
 
-  async findByIdPopulated(id: string): Promise<IAd | null> {
-    return await this.model.findById(id).populate('advertiserId').exec();
+  async findByIdPopulated(id: string | number): Promise<Ad | null> {
+    return await this.model.findByPk(id, {
+      include: [{ model: Advertiser, as: 'advertiser' }]
+    });
   }
 }

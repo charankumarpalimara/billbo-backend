@@ -1,6 +1,7 @@
 import { AdRepository } from '../repositories/AdRepository';
 import { AllotmentRepository } from '../repositories/AllotmentRepository';
 import { IAd } from '../models/Ad';
+import { deleteFileFromS3 } from '../utils/s3Helpers';
 
 export class AdService {
   private adRepository = new AdRepository();
@@ -12,6 +13,10 @@ export class AdService {
 
   async getAdsPaginated(page: number, limit: number): Promise<{ data: IAd[]; total: number }> {
     return await this.adRepository.findPaginatedWithAdvertiser(page, limit);
+  }
+
+  async getAdById(id: string): Promise<IAd | null> {
+    return await this.adRepository.findById(id);
   }
 
   async createAd(data: Partial<IAd>): Promise<IAd> {
@@ -33,6 +38,13 @@ export class AdService {
     const ad = await this.adRepository.delete(id);
     if (ad) {
       await this.allotmentRepository.removeAdFromAllotments(id);
+      if (ad.youtubeUrl) {
+        try {
+          await deleteFileFromS3(ad.youtubeUrl);
+        } catch (err) {
+          console.error("Failed to delete associated S3 file:", err);
+        }
+      }
     }
     return ad;
   }
